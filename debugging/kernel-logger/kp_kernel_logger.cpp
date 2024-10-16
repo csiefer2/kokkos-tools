@@ -19,13 +19,71 @@
 #include <vector>
 #include <string>
 #include <limits>
+#include <climits>
 #include <cstring>
+#include "impl/Kokkos_Profiling_Interface.hpp"
 
 std::vector<std::string> regions;
 static uint64_t uniqID;
 struct SpaceHandle {
   char name[64];
 };
+
+
+
+
+// Get a useful label from the deviceId
+// NOTE: Relevant code is in: kokkos/core/src/impl/Kokkos_Profiling_Interface.hpp
+std::string deviceIdToString(const uint32_t deviceId) {
+  using namespace Kokkos::Tools::Experimental;
+  std::string device_label("(");
+  ExecutionSpaceIdentifier eid = identifier_from_devid(deviceId);
+  if      (eid.type == DeviceType::Serial)       device_label+="Serial";
+  else if (eid.type == DeviceType::OpenMP)       device_label+="OpenMP";
+  else if (eid.type == DeviceType::Cuda)         device_label+="Cuda";
+  else if (eid.type == DeviceType::HIP)          device_label+="HIP";
+  else if (eid.type == DeviceType::OpenMPTarget) device_label+="OpenMPTarget";
+  else if (eid.type == DeviceType::HPX)          device_label+="HPX";
+  else if (eid.type == DeviceType::Threads)      device_label+="Threads";
+  else if (eid.type == DeviceType::SYCL)         device_label+="SYCL";
+  else if (eid.type == DeviceType::OpenACC)      device_label+="OpenACC";
+  else if (eid.type == DeviceType::Unknown)      device_label+="Unknown";
+  else                                           device_label+="Unknown to KokkosTools";
+  
+  if(eid.instance_id == int_for_synchronization_reason(SpecialSynchronizationCases::GlobalDeviceSynchronization))
+    device_label += " All Instances)";
+  else if(eid.instance_id == int_for_synchronization_reason(SpecialSynchronizationCases::DeepCopyResourceSynchronization))
+    device_label += " DeepCopyResource)";
+  else
+    device_label += " Instance " + std::to_string(eid.instance_id) + ")";
+  
+  return device_label;
+}
+
+
+
+
+bool suppressCounts() {
+  static bool value=false;
+  static bool initialized=false;
+  
+  if(initialized) 
+    return value;
+  else {
+    const char* varVal = std::getenv("KOKKOS_PROFILE_SUPPRESS_COUNTS");
+    if(varVal) {
+      std::string v = std::string(varVal);
+      // default to false
+      if (v=="1" || v=="ON" || v=="on" || v=="TRUE" || v=="true" || v=="YES" || v=="yes") 
+	value=true;
+      else
+	value=false;
+    }
+    initialized=true;
+    return value;
+  }
+} 
+
 
 void kokkosp_print_region_stack_indent(const int level) {
   printf("KokkosP: ");
@@ -67,11 +125,15 @@ extern "C" void kokkosp_begin_parallel_for(const char* name,
                                            const uint32_t devID,
                                            uint64_t* kID) {
   *kID = uniqID++;
-
+  int output=*kID;
+  if(suppressCounts())
+    output=0;
+    
+  
   printf(
-      "KokkosP: Executing parallel-for kernel on device %d with unique "
+      "KokkosP: Executing parallel-for kernel on device %s with unique "
       "execution identifier %llu\n",
-      devID, (unsigned long long)(*kID));
+      deviceIdToString(devID).c_str(), (unsigned long long)(output));
 
   int level = kokkosp_print_region_stack();
   kokkosp_print_region_stack_indent(level);
@@ -80,19 +142,25 @@ extern "C" void kokkosp_begin_parallel_for(const char* name,
 }
 
 extern "C" void kokkosp_end_parallel_for(const uint64_t kID) {
+  int output=kID;
+  if(suppressCounts())
+    output=0;
   printf("KokkosP: Execution of kernel %llu is completed.\n",
-         (unsigned long long)(kID));
+         (unsigned long long)output);
 }
 
 extern "C" void kokkosp_begin_parallel_scan(const char* name,
                                             const uint32_t devID,
                                             uint64_t* kID) {
   *kID = uniqID++;
-
+  int output=*kID;
+  if(suppressCounts())
+    output=0;
+  
   printf(
-      "KokkosP: Executing parallel-scan kernel on device %d with unique "
+      "KokkosP: Executing parallel-scan kernel on device %s with unique "
       "execution identifier %llu\n",
-      devID, (unsigned long long)(*kID));
+      deviceIdToString(devID).c_str(), (unsigned long long)(output));
 
   int level = kokkosp_print_region_stack();
   kokkosp_print_region_stack_indent(level);
@@ -101,19 +169,25 @@ extern "C" void kokkosp_begin_parallel_scan(const char* name,
 }
 
 extern "C" void kokkosp_end_parallel_scan(const uint64_t kID) {
+  int output=kID;
+  if(suppressCounts())
+    output=0;
   printf("KokkosP: Execution of kernel %llu is completed.\n",
-         (unsigned long long)(kID));
+         (unsigned long long)(output));
 }
 
 extern "C" void kokkosp_begin_parallel_reduce(const char* name,
                                               const uint32_t devID,
                                               uint64_t* kID) {
   *kID = uniqID++;
+  int output=*kID;
+  if(suppressCounts())
+    output=0;
 
   printf(
-      "KokkosP: Executing parallel-reduce kernel on device %d with unique "
+      "KokkosP: Executing parallel-reduce kernel on device %s with unique "
       "execution identifier %llu\n",
-      devID, (unsigned long long)(*kID));
+      deviceIdToString(devID).c_str(), (unsigned long long)(output));
 
   int level = kokkosp_print_region_stack();
   kokkosp_print_region_stack_indent(level);
@@ -122,8 +196,12 @@ extern "C" void kokkosp_begin_parallel_reduce(const char* name,
 }
 
 extern "C" void kokkosp_end_parallel_reduce(const uint64_t kID) {
+  int output=kID;
+  if(suppressCounts())
+    output=0;
+
   printf("KokkosP: Execution of kernel %llu is completed.\n",
-         (unsigned long long)(kID));
+         (unsigned long long)(output));
 }
 
 extern "C" void kokkosp_begin_fence(const char* name, const uint32_t devID,
@@ -139,10 +217,14 @@ extern "C" void kokkosp_begin_fence(const char* name, const uint32_t devID,
   } else {
     *kID = uniqID++;
 
+    int output=*kID;
+    if(suppressCounts())
+      output=0;
+    
     printf(
-        "KokkosP: Executing fence on device %d with unique execution "
+        "KokkosP: Executing fence on device %s with unique execution "
         "identifier %llu\n",
-        devID, (unsigned long long)(*kID));
+        deviceIdToString(devID).c_str(), (unsigned long long)(output));
 
     int level = kokkosp_print_region_stack();
     kokkosp_print_region_stack_indent(level);
@@ -156,8 +238,12 @@ extern "C" void kokkosp_end_fence(const uint64_t kID) {
   // dealing with the application's fence, which we filtered out in the callback
   // for fences
   if (kID != std::numeric_limits<uint64_t>::max()) {
+    int output=kID;
+    if(suppressCounts())
+      output=0;
+    
     printf("KokkosP: Execution of fence %llu is completed.\n",
-           (unsigned long long)(kID));
+           (unsigned long long)(output));
   }
 }
 
