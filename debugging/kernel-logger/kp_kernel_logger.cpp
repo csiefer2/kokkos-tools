@@ -74,25 +74,18 @@ std::string deviceIdToString(const uint32_t deviceId) {
 }
 
 bool suppressCounts() {
-  static bool value       = false;
-  static bool initialized = false;
-
-  if (initialized)
-    return value;
-  else {
+  static bool value       = [](){
     const char* varVal = std::getenv("KOKKOS_PROFILE_SUPPRESS_COUNTS");
     if (varVal) {
       std::string v = std::string(varVal);
       // default to false
       if (v == "1" || v == "ON" || v == "on" || v == "TRUE" || v == "true" ||
           v == "YES" || v == "yes")
-        value = true;
-      else
-        value = false;
+        return true;
     }
-    initialized = true;
-    return value;
-  }
+    return false;
+  }();
+  return value;
 }
 
 void kokkosp_print_region_stack_indent(const int level) {
