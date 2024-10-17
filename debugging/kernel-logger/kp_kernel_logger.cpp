@@ -75,7 +75,7 @@ std::string deviceIdToString(const uint32_t deviceId) {
 
 bool suppressCounts() {
   static bool value       = [](){
-    const char* varVal = std::getenv("KOKKOS_PROFILE_SUPPRESS_COUNTS");
+    const char* varVal = std::getenv("KOKKOS_TOOLS_LOGGER_SUPPRESS_COUNTS");
     if (varVal) {
       std::string v = std::string(varVal);
       // default to false
