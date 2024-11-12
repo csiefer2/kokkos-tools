@@ -159,7 +159,10 @@ extern "C" void kokkosp_begin_parallel_scan(const char* name,
   printf(
       "KokkosP: Executing parallel-scan kernel on device %s with unique "
       "execution identifier %llu\n",
-      deviceIdToString(devID).c_str(), (unsigned long long)(output));
+      printf(
+      "KokkosP: Executing parallel-scan kernel on device %d (%s) with unique "
+      "execution identifier %llu\n",
+      devID, deviceIdToString(devID).c_str(), (unsigned long long)(output));
 
   int level = kokkosp_print_region_stack();
   kokkosp_print_region_stack_indent(level);
